@@ -1,3 +1,4 @@
+JSR !start
 start:
     JMP !loop
 loop:
@@ -5,9 +6,9 @@ loop:
     TXA
     STA $D012
     CMP #3E
-    BEQ #08
+    BEQ #06
     NOP
     JMP !loop
 end:
     LDX #00
-    JMP !start
+    RTS

@@ -1,8 +1,10 @@
 import os
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 #silence hello pygame! message
-import pygame
-import pygame
+try:
+    import pygame
+except ModuleNotFoundError:
+    pass
 import sys
 
 class Screen:
@@ -75,7 +77,7 @@ class Screen:
                 for event in self.pygame.event.get():
                         if event.type == self.pygame.QUIT:
                               self.running = False
-                        elif event.type == self.pygame.KEYDOWN:
+                        elif event.type == self.pygame.KEYUP:
                             if event.key == self.pygame.K_ESCAPE:
                                 self.running = False
                                 sys.exit()

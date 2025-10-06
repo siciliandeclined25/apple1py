@@ -6,9 +6,9 @@ import func
 class Apple1Py:
   def __init__(self, file="mem.b", size=0x1000):
     self.memoryFile = file
-    data = bytes(size) #fill full of empty 0s
-    with open(self.memoryFile, "wb") as f:
-         f.write(data)
+    #data = bytes(size) #fill full of empty 0s
+    #with open(self.memoryFile, "wb") as f:
+         #f.write(data)
     self.displayCommandAfter = False
     #my own homemade 6502 optable!
     self.optable = {
@@ -20,7 +20,7 @@ class Apple1Py:
     "LDX imm": {"ascii": "LDA", "bytes": 0xA2,  "space": 2},
     "LDA abs": {"ascii": "LDA", "bytes": 0xBD, "space": 3},
     "STA zpg": {"ascii": "STA", "bytes": 0x65,  "space": 2},
-    "STA abs": {"ascii": "STA", "bytes": 0x8D,  "space": 2},
+    "STA abs": {"ascii": "STA", "bytes": 0x8D,  "space": 3},
     "INX imm": {"ascii": "INX", "bytes": 0xE8,  "space": 1},
     "DEX imm": {"ascii": "DEX", "bytes": 0xCA,  "space": 1},
     "JMP imm": {"ascii": "JMP", "bytes": 0x4C,  "space": 3},
@@ -60,6 +60,8 @@ class Apple1Py:
     self.decimalFlag = 0
     #modules external to the project added as self here
     self.graphics = None #don't initialize graphics here until start() is called
+    self.doGraphics = False
+    open("debug.log", "w").close()
   def getB(self, byteLocation):
       memoryInt = list(open(self.memoryFile, "rb").read())
       return memoryInt[byteLocation]
@@ -67,12 +69,36 @@ class Apple1Py:
       #(special case are special enough to break the rules)
       #(when it's 50 year old hardware emulation)
       if int(byteLocation) == 53266: #decimal reprsentation of D012
-        self.graphics.write(str(self.characters[self.a])) #print character
+        if self.doGraphics:
+            self.graphics.write(str(self.characters[self.a])) #print character
+        else:
+            print(str(self.characters[self.a]), end="", flush=True)
         return False
       memoryInt = list(open(self.memoryFile, "rb").read())
       memoryInt[byteLocation] = byteValue
       open(self.memoryFile, "wb").write(bytes(memoryInt))
-  def addLabelReference(self, trueByteValue, bytesGiven, labelsGiven):
+  def convertToSignedByte(self, byteValue):
+      if byteValue > 127:
+          return byteValue - 256
+      return byteValue
+  def getWrappedRelativeAddress(pc: int, offset: int) -> int:
+          """
+          Simulate 6502 branch wraparound.
+
+          pc: int, 16-bit program counter (0-65535)
+          offset: int, signed 8-bit (-128..127)
+
+          Returns new program counter (0-65535).
+          """
+          # Ensure inputs are in range
+          pc &= 0xFFFF
+          if not -128 <= offset <= 127:
+              raise ValueError("Offset must be signed 8-bit (-128..127)")
+
+          # Add offset to PC, then wrap to 16-bit
+          new_pc = (pc + offset) & 0xFFFF
+          return new_pc
+  def addLabelReference(self, trueByteValue, bytesGiven, labelsGiven, relativeLabel=False):
       foundLabel = False
       for labelReference in labelsGiven:
           if labelReference["name"] == trueByteValue.replace("!", "") and labelReference["location"] != False:
@@ -131,6 +157,9 @@ class Apple1Py:
             print("DECIMAL: " + str(self.decimalFlag))
         if userPrompt == "g":
           i = int(input("Type in a hex memory address>"), 10)
+  def apple1AddressConversion(self, n: int) -> str:
+      """Converts an integer into a valid 16-bit address."""
+      return format(n & 0xFFFF, "04X")
   def convert(self, fileIn, debug=False):
     """Converts a given fileIn to the file set up when ApplePy1 was initialized."""
     print("Welcome to LBAD (Lucas' Bad Assembler/Debugger)\nMIT License 2.0 - by Lucas Frias 2025")
@@ -213,7 +242,6 @@ class Apple1Py:
             bytesGiven.append(low)
           if trueByteValue[0] == "!":
               bytesGiven.append(self.optable["JMP imm"]["bytes"])
-              input('adding label reference for ' + trueByteValue + "at " + str(len(bytesGiven)))
               self.addLabelReference(trueByteValue, bytesGiven, labelsGiven)
       elif trueKeyword == "INX":
           bytesGiven.append(self.optable["INX imm"]["bytes"])
@@ -226,7 +254,7 @@ class Apple1Py:
           try:
               bytesGiven.append(int(trueByteValue.replace("#", "")))
           except ValueError:
-              self.addLabelReference(trueByteValue, bytesGiven, labelsGiven)
+              self.addLabelReference(trueByteValue, bytesGiven, labelsGiven, relativeLabel=True)
       elif trueKeyword == "BPL":
           bytesGiven.append(self.optable["BEQ rel"]["bytes"])
           try:
@@ -265,7 +293,6 @@ class Apple1Py:
             bytesGiven.append(lowByte)
 
       elif trueKeyword == "LDA":
-        input("reached an LDA")
         if trueByteValue[0] == "!": #this is a label reference
             #let's make sure there's no, X or Y here
             trueByteValue = trueByteValue.split(",")[0]
@@ -327,14 +354,13 @@ class Apple1Py:
                     # using JMP or labels which should always be assumed. not optimized but
                     # defintely is valid 6502
                     #globalFixPointerFromImmediateOffset += 1
-                    print(bytesGiven[:20])
+                    #print(bytesGiven[:20])
                     twoByteAdd = pref[1]["location"] #+ globalFixPointerFromImmediateOffset
                     lowByte = (twoByteAdd >> 8) & 0xFF   # top 8 bits
                     highByte  = twoByteAdd & 0xFF           # bottom 8 bits
                     bytesGiven[pointer] = highByte
                     bytesGiven[pointer+1] = lowByte #insert it in!!! ;)
-                    input()
-                    print(bytesGiven[:20])
+                    #print(bytesGiven[:20])
                     skipImmediateOffset = True #skips the next time so that we don't read the bumped value
     # finally check for straggles and fail if there
     # is no pointer for a label like ever bro
@@ -348,24 +374,33 @@ class Apple1Py:
     memoryInt = list(open(self.memoryFile, "rb").read())
     nums = memoryInt[:30]
     hex_list = [hex(n) for n in nums]
-    programList = []
     miniProgramCounter = 0
+    lineToPrint = ""
+    noOpcodeNewLine = 0
     for value in hex_list:
         foundOpCode = False
         for opcode, opcodevalues in self.optable.items():
-           ## print(opcodevalues["bytes"])
-            ##print(type(opcodevalues["bytes"]))
-           ## print(int(str(value), 16))
-           ## print(type(int(value, 16)))
-            if opcodevalues["bytes"] == int(str(value), 16):
-                programList.append(opcode + " (" + str(value) + ") - " + str(hex(miniProgramCounter)))
+            #go through table of opcodes
+            if opcodevalues["bytes"] == int(str(value), 16) and noOpcodeNewLine == 0:
+                #display the correct opcode and its value
+                lineToPrint = lineToPrint + self.apple1AddressConversion(miniProgramCounter) + " Instruction: " +str(opcode + " (" + str(value) + ") - ")
                 miniProgramCounter += opcodevalues["space"]
+                print(opcodevalues["ascii"])
+                noOpcodeNewLine = opcodevalues["space"]-1 #add this to determine the newline
+                print(noOpcodeNewLine)
+
                 foundOpCode = True
+                if noOpcodeNewLine == 0:
+                    lineToPrint = lineToPrint + "\n" #add an offset immediately for 0 instruction sets
         if not foundOpCode:
-            programList.append(str(value) + " (no op code)")
+            noOpcodeNewLine -= 1
+            print(noOpcodeNewLine)
+            lineToPrint =  lineToPrint + " | " + str(int(value, 16)) + " | "
+            if noOpcodeNewLine == 0:
+                lineToPrint = lineToPrint + " \n" #add a newline, this instruction is over
     print("")
     if debug:
-        for _ in programList: print (_)
+        print(lineToPrint)
         print("MEMORY WRITTEN")
     input("ready>")
     print("-------------")
@@ -373,19 +408,22 @@ class Apple1Py:
     opInt = int(opCodeToexecute, 16)
     firstValueByte = self.getB(self.pc+1)
     secondValueByte = self.getB(self.pc+2)
-    time.sleep(0.005)
+    time.sleep(0.001)
     result = -1
     result = "No opcode"
-    if stepMode:
-      for opcode, opcodevalues in self.optable.items():
-          if opcodevalues["bytes"] == opInt:
+    for opcode, opcodevalues in self.optable.items():
+        if opcodevalues["bytes"] == opInt:
               result = " " + opcodevalues["ascii"]
+    if stepMode:
       print("Apple1Py: Executing VALUE - " + hex(opInt) + " AT " + str(hex(self.pc)) + result)
+    else:
+        open("debug.log", "a").write("| Apple1Py: Executing VALUE - " + hex(opInt) + " AT " + str(hex(self.pc)) + result + "|\n Info: " + "A: " + str(self.a) + " X: " + str(self.x) + " Y: " + str(self.y) + " SP: " + str(self.sp) + " PC: " + str(self.pc) + " C: " + str(self.carryFlag) + " Z: " + str(self.zeroFlag) + " I: " + str(self.interruptFlag) + " D: " + str(self.decimalFlag) + " B: " + str(self.breakFlag) + " V: " + str(self.overflowFlag) + " N: " + str(self.negFlag) + "\n")
     if self.displayCommandAfter == True:
         pass
     if opInt == 0: #BRK impl
       #increment program counter
       self.pc += 1
+      open("debug.log", "a").write("!!!BREAK!!!!\n")
       return "brk"
     if opInt == 0xAA: #TAX impl
       self.x = self.a
@@ -406,9 +444,12 @@ class Apple1Py:
     if opInt == 0xE0: #CPX immediate
         if self.x == firstValueByte: #if equal zeroflag true
             self.zeroFlag = 1
+            open("debug.log", "a").write("!!!COMPARE IS EQUAL - zeroflag on!!!!\n")
         if self.x >= firstValueByte: #if greater carry flag tru
+            open("debug.log", "a").write("!!!COMPARE IS GREATER - carryflag on!!!!\n")
             self.carryFlag = 1
         if self.x <= firstValueByte: #if lesser carry flag false
+            open("debug.log", "a").write("!!!COMPARE IS LESSER - carryflag off!!!!\n")
             self.carryFlag = 0
         invertedX = self.x #invertx
         invertedX &= 0xFF
@@ -416,6 +457,8 @@ class Apple1Py:
         operand &= 0xFF
         resultNFlag = (invertedX - operand) & 0xFF
         self.negFlag = (resultNFlag & 0x80) != 0 #negative flag
+        if self.negFlag == 1:
+            open("debug.log", "a").write("!!!COMPARE IS NEGATIVE BITWISE - negflag on!!!!\n")
         self.pc += 2
     if opInt == 0x60: #RTS impl
         highByte = self.getB(self.sp+1)
@@ -423,6 +466,7 @@ class Apple1Py:
         finalByte = (lowByte << 8) | highByte
         self.pc = finalByte #get the value from the stack pointer and se it to the pc value
         self.sp += 2 #move it up by one because subroutines wooo
+        open("debug.log", "a").write("Program Counter: Returning to address {} from subroutine\n".format(finalByte))
     if opInt == 165: #LDA immediate
         #loads the hex value given as output to
         #the value given
@@ -433,20 +477,24 @@ class Apple1Py:
         self.pc += 2
         self.a = self.getB(firstValueByte) + self.x
         result = self.a
-    if opInt == 0xC9:
+    if opInt == 0xC9: #CMP immediate
         if self.a == firstValueByte:
-            #input("AYAYA")
             self.zeroFlag = 1
             result = 0 #IMPORTANT FOR ZEROFLAG
+            open("debug.log", "a").write("ZERO FLAG IS TRUE\n")
         if self.a >= firstValueByte:
+            open("debug.log", "a").write("CARRY FLAG IS TRUE\n")
             self.carryFlag = 1
         negFlagCompare = (self.a - firstValueByte) & 0xFF
         if (negFlagCompare >> 7) & 1:
+            open("debug.log", "a").write("NEG FLAG IS TRUE\n")
             self.negFlag = 1
         self.pc += 2
     if opInt == 0x90:
         if self.carryFlag == 1:
             self.pc += firstValueByte
+            open("debug.log", "a").write("Program Counter: Carry flag true, jumped " + str(firstValueByte) + " bytes forward\n")
+
         else:
             self.pc += 2
     if opInt == 0xCA: #DEX
@@ -466,6 +514,8 @@ class Apple1Py:
         lowByte = self.getB(self.pc+2)
         finalByte = (lowByte << 8) | highByte
         self.pc = finalByte
+        open("debug.log", "a").write("Program Counter: Jumped to $" + str(finalByte) + " \n")
+
     if opInt == 101: #STA zpg
         #loads into value the zeropage
         self.pc += 2
@@ -477,6 +527,8 @@ class Apple1Py:
         if self.zeroFlag == 1:
             self.pc += int(str(firstValueByte), 0)
             self.displayCommandAfter = False
+            open("debug.log", "a").write("Program Counter: Zeroflag true, jumped to $" + str(firstValueByte) + " \n")
+
         else:
             self.pc += 2
     if opInt == 0x20: #JSR
@@ -508,6 +560,7 @@ class Apple1Py:
         self.sp -= 1 #de novo
         #now we need to set the pc to be equal to the JSR address
         self.pc =  ((lowByteJSRAddress << 8) | highByteJSRAddress)
+        open("debug.log", "a").write("Program Counter: Jumped to subroutine at $" + str(firstValueByte) + " with return address $" + str(returnAddressForRT) + " \n")
     if opInt == 141: #STA abs
         #loads into value the zeropage
         highByte = self.getB(self.pc+1)
@@ -531,10 +584,10 @@ class Apple1Py:
     else:
         self.zeroFlag = 0 #this means that the zeroflag was cleared
   def start(self, debug=False):
-    self.graphics = graphics.Screen() #now initialize graphics here
+    if self.doGraphics:
+        self.graphics = graphics.Screen() #now initialize graphics here
     memoryInt = list(open(self.memoryFile, "rb").read())
     memoryHex = [hex(b) for b in memoryInt]
-    func.beep()
     while True:
       try:
         if debug:
@@ -553,9 +606,10 @@ class Apple1Py:
             print("err")
             raise e
       if returnCode == "brk":
-        self.graphics.pygame.display.set_caption("apple1py - program ended")
-        while True:
-            self.graphics.update()
+        if self.doGraphics:
+            self.graphics.pygame.display.set_caption("apple1py - program ended")
+            while True:
+                self.graphics.update()
         break
     if debug:
         self.memoryDisplayer()

@@ -1,5 +1,8 @@
-import numpy as np
-import simpleaudio as sa
+try:
+    import pygame
+except ModuleNotFoundError:
+    pass
+import sys
 
 
 def beep():
