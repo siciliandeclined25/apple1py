@@ -6,7 +6,7 @@ loop:
     TXA
     STA $D012
     CMP #3E
-    BEQ #06
+    BEQ !end
     NOP
     JMP !loop
 end:
