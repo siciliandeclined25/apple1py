@@ -14,6 +14,7 @@ class Apple1Py:
         # my own homemade 6502 optable!
         self.optable = {
             "BRK impl": {"ascii": "BRK", "bytes": 00, "space": 1},
+            "ORA ind x": {"ascii": "ORA", "bytes": 0x05, "space": 2},
             "NOP impl": {"ascii": "NOP", "bytes": 0xEA, "space": 1},
             "LDA zpg": {"ascii": "LDA", "bytes": 0xA5, "space": 2},  # zeropage (0-256)
             "LDA imm": {
@@ -273,6 +274,128 @@ class Apple1Py:
         return format(n & 0xFFFF, "04X")
 
     def convert(self, fileIn, debug=False):
+        print(
+            "Welcome to LBAD (Lucas' Bad Assembler/Debugger)\nMIT License 2.0 - by Lucas Frias 2025"
+        )
+        time.sleep(0.2)
+        fileToConvert = list(open(fileIn, "r"))
+        bytesGiven = []
+        byteLocation = 0
+        labelsGiven = []
+        while True:
+            if len(fileToConvert) == byteLocation:
+                break
+            currentByte = fileToConvert[byteLocation]
+            print(".", end="")
+            try:  # if this fails then it's just empty space
+                trueKeyword = currentByte.split(";")[0].split()[0]
+            except IndexError:
+                byteLocation += 1
+                continue
+            try:
+                print(currentByte)
+                trueByteValue = currentByte.split()[1]
+                print(trueByteValue)
+            except IndexError:  # no keyword
+                trueByteValue = ""
+            if trueKeyword[-1] == ":":  # label, so jump to the correct value
+                #### THE PROBLEM
+                # when JMP or JSR is used the space given is defined with
+                # ref! which is defined as one byte even though it really becomes two bytes
+                # later as the reference is filled in the future
+                # because of this, the function to define a label's location fails because it
+                # attempts to reference the low byte of the little endian
+                # given by the 6502. eia ergo, advocata nostra, forgive me for this
+                # terrrible code that fixes this issue. implemented later (in the ref! appending for JMP and JSR)
+                # we will implement a (pass) element that will be removed, which will give it the
+                # adequate length. this makes my eye look lioke a good home for a pilot g2 trump assasin style
+                # but "it's gonna be alright" - kendrick lamar, wisest programmer ever.
+                labelsGiven.append(
+                    {"name": trueKeyword[:-1], "location": len(bytesGiven)}
+                )
+                # bytesGiven.append(self.optable["NOP impl"]["bytes"])#this is added so that when
+                # it jumps to this memory location it's not empty and still exists on a 1:1 ratio
+            # okay as of oct 17th i want to make a robust implementation instead of a bunch of branching if statements
+            # it's better and easier for development cycle since i still have  agood hundred keywords to write
+            else:
+                for keyword, keywordMetadata in self.optable.items():
+                    if keyword[:3] == trueKeyword:  # first three letters should match
+                        # this could not potentially be the correct one(different types of memroy)
+                        # now we need to read the address and see if it works
+                        # 0. fill in the correct label value given
+                        input(bytesGiven)
+                        if len(trueByteValue) != 0:  # making sure there's a value
+                            if trueByteValue[0] == "!":  # we're dealing with a label
+                                # now we just have to see if it's relative of absolute and fill it in
+                                # accordingly
+                                if "rel" in keyword[3:]:
+                                    # this is a relative address
+                                    bytesGiven.append(keywordMetadata["bytes"])
+                                    self.addLabelReference(
+                                        trueByteValue,
+                                        bytesGiven,
+                                        labelsGiven,
+                                        relativeLabel=True,
+                                    )
+                                else:  # absolute addressing
+                                    bytesGiven.append(keywordMetadata["bytes"])
+                                    self.addLabelReference(
+                                        trueByteValue,
+                                        bytesGiven,
+                                        labelsGiven,  # relativelabel = false by default in kwargs
+                                    )
+                            # 1 immediate addressing
+                            if trueByteValue[:2] == "#$":  # immediate
+                                # now we need to make sure the version we have is the immediate version
+                                if (
+                                    "imm" in keyword[3:].strip()
+                                ):  # make sure it's immedaite
+                                    bytesGiven.append(keywordMetadata["bytes"])
+                                    bytesGiven.append(int(trueByteValue[2:], 16))
+                                else:  # this is the wrong type, right keyword, just let it loop
+                                    pass  # for clarity
+                            # 2 zpg addressing
+                            if trueByteValue[0] == "$":
+                                # 3 zpg x addr
+                                print("nadademais" + str(len(trueByteValue)))
+                                if len(trueByteValue) == 5:
+                                    input(trueByteValue[-1])
+                                    print("mom frere jaqieus")
+                                    if trueByteValue[-1] == "X":
+                                        # check to make sure that keyword is actually zpgx
+                                        input("erm")
+                                        input(keyword)
+                                        if "zpg x" in keyword:
+                                            bytesGiven.append(keywordMetadata["bytes"])
+                                            bytesGiven.append(
+                                                int(
+                                                    trueByteValue.replace(
+                                                        "$", ""
+                                                    ).replace(",X", ""),
+                                                    16,
+                                                )
+                                            )
+                                    # y addresing
+                                    if trueByteValue[-1] == "Y":
+                                        if "zpg y" in keyword:
+                                            bytesGiven.append(keywordMetadata["bytes"])
+                                            bytesGiven.append(
+                                                int(
+                                                    trueByteValue.replace(
+                                                        "$", ""
+                                                    ).replace(",Y", ""),
+                                                    16,
+                                                )
+                                            )
+
+                        else:  # otherwise, this is a immediate addressing
+                            input(keywordMetadata["bytes"])
+                            bytesGiven.append(keywordMetadata["bytes"])
+            byteLocation += 1
+            # bytesGiven.append(self.optable["NOP impl"]["bytes"])#this is added so that when
+            # it jumps to this memory location it's not empty and still exists on a 1:1 ratio
+
+    def legacyConvert(self, fileIn, debug=False):
         """Converts a given fileIn to the file set up when ApplePy1 was initialized."""
         print(
             "Welcome to LBAD (Lucas' Bad Assembler/Debugger)\nMIT License 2.0 - by Lucas Frias 2025"
@@ -333,6 +456,8 @@ class Apple1Py:
                         bytesGiven.append(int(charGiven, 16))
                     except ValueError:
                         pass
+                # if trueKeyword == "ORA":
+                pass
             if trueKeyword == "BRK":
                 bytesGiven.append(self.optable["BRK impl"]["bytes"])
             elif trueKeyword == "CPX":

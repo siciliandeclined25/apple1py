@@ -1,0 +1,28 @@
+0000 Instruction: LDX imm (0xa2) -  | 0003 |  
+0002 Instruction: TXS impl (0x9a) - 
+0003 Instruction: LDX imm (0xa2) -  | 0000 |  
+0005 Instruction: TSX impl (0xba) - 
+0006 Instruction: BRK impl (0x0) - 
+0007 Instruction: BRK impl (0x0) - 
+0008 Instruction: BRK impl (0x0) - 
+0009 Instruction: BRK impl (0x0) - 
+000A Instruction: BRK impl (0x0) - 
+000B Instruction: BRK impl (0x0) - 
+000C Instruction: BRK impl (0x0) - 
+000D Instruction: BRK impl (0x0) - 
+000E Instruction: BRK impl (0x0) - 
+000F Instruction: BRK impl (0x0) - 
+0010 Instruction: BRK impl (0x0) - 
+0011 Instruction: BRK impl (0x0) - 
+0012 Instruction: BRK impl (0x0) - 
+0013 Instruction: BRK impl (0x0) - 
+0014 Instruction: BRK impl (0x0) - 
+0015 Instruction: BRK impl (0x0) - 
+0016 Instruction: BRK impl (0x0) - 
+0017 Instruction: BRK impl (0x0) - 
+0018 Instruction: BRK impl (0x0) - 
+0019 Instruction: BRK impl (0x0) - 
+001A Instruction: BRK impl (0x0) - 
+001B Instruction: BRK impl (0x0) - 
+001C Instruction: BRK impl (0x0) - 
+001D Instruction: BRK impl (0x0) - 
