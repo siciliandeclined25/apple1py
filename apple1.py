@@ -1,7 +1,8 @@
 import subprocess
 import time
-import graphics
+
 import func
+import graphics
 
 
 class Apple1Py:
@@ -43,6 +44,7 @@ class Apple1Py:
             "TXS impl": {"ascii": "TXS", "bytes": 0x9A, "space": 1},
             "TAX impl": {"ascii": "TXS", "bytes": 0xAA, "space": 1},
             "TSX impl": {"ascii": "TXS", "bytes": 0xBA, "space": 1},
+            "PHP impl": {"ascii": "PHP", "bytes": 0x08, "space": 1},
         }
         self.characters = [
             " ",
@@ -116,7 +118,9 @@ class Apple1Py:
         self.x = 0
         self.y = 0
         self.pc = 0  # program counter
-        self.sp = 0xFF  # stack pointer
+        self.stackStart = 0x0100
+        self.stackEnd = 0x01FF
+        self.sp = self.stackEnd  # stack pointer
         self.carryFlag = 0
         self.zeroFlag = 0
         self.negFlag = 0
@@ -145,6 +149,19 @@ class Apple1Py:
         memoryInt = list(open(self.memoryFile, "rb").read())
         memoryInt[byteLocation] = byteValue
         open(self.memoryFile, "wb").write(bytes(memoryInt))
+
+    def makeStatusByte(self):
+        # Compose the status byte from individual flags
+        status = 0
+        status |= (1 << 7) if self.negFlag else 0
+        status |= (1 << 6) if self.overflowFlag else 0
+        status |= (1 << 5) if True else 0  # Always set to 1 in push operations
+        status |= (1 << 4) if self.breakFlag else 0
+        status |= (1 << 3) if self.decimalFlag else 0
+        status |= (1 << 2) if self.interruptFlag else 0
+        status |= (1 << 1) if self.zeroFlag else 0
+        status |= 1 if self.carryFlag else 0
+        return status
 
     def convertToSignedByte(self, byteValue):
         if byteValue > 127:
@@ -252,7 +269,7 @@ class Apple1Py:
             if userPrompt == "b":
                 print(memoryInt)
             if userPrompt == "s":
-                for addr in range(0x0100, 0x0200):
+                for addr in range(self.stackStart, self.stackEnd + 1):
                     print(f"${addr:04X}: {memoryInt[addr]:02X}")
             if userPrompt == "i":
                 print("A: " + str(self.a))
@@ -267,13 +284,13 @@ class Apple1Py:
                 print("INTERRUPT: " + str(self.interruptFlag))
                 print("DECIMAL: " + str(self.decimalFlag))
             if userPrompt == "g":
-                i = int(input("Type in a hex memory address>"), 10)
+                i = int(input("Type in a hex memory address>"), 16)
 
     def apple1AddressConversion(self, n: int) -> str:
         """Converts an integer into a valid 16-bit address."""
         return format(n & 0xFFFF, "04X")
 
-    def convert(self, fileIn, debug=False):
+    def otherconvert(self, fileIn, debug=False):
         print(
             "Welcome to LBAD (Lucas' Bad Assembler/Debugger)\nMIT License 2.0 - by Lucas Frias 2025"
         )
@@ -323,7 +340,6 @@ class Apple1Py:
                         # this could not potentially be the correct one(different types of memroy)
                         # now we need to read the address and see if it works
                         # 0. fill in the correct label value given
-                        input(bytesGiven)
                         if len(trueByteValue) != 0:  # making sure there's a value
                             if trueByteValue[0] == "!":  # we're dealing with a label
                                 # now we just have to see if it's relative of absolute and fill it in
@@ -354,17 +370,24 @@ class Apple1Py:
                                     bytesGiven.append(int(trueByteValue[2:], 16))
                                 else:  # this is the wrong type, right keyword, just let it loop
                                     pass  # for clarity
-                            # 2 zpg addressing
                             if trueByteValue[0] == "$":
+                                if len(trueByteValue) == 3:
+                                    # 2 zpg addressing
+                                    print("this happened")
+                                    if (
+                                        "zpg" in keyword
+                                        and not "x" in keyword
+                                        and not "y" in keyword
+                                    ):  # just being safe
+                                        bytesGiven.append(keywordMetadata["bytes"])
+                                        print("for reall!!!")
+                                        bytesGiven.append(
+                                            int(trueByteValue.replace("$", ""), 16)
+                                        )
                                 # 3 zpg x addr
-                                print("nadademais" + str(len(trueByteValue)))
                                 if len(trueByteValue) == 5:
-                                    input(trueByteValue[-1])
-                                    print("mom frere jaqieus")
                                     if trueByteValue[-1] == "X":
                                         # check to make sure that keyword is actually zpgx
-                                        input("erm")
-                                        input(keyword)
                                         if "zpg x" in keyword:
                                             bytesGiven.append(keywordMetadata["bytes"])
                                             bytesGiven.append(
@@ -387,15 +410,16 @@ class Apple1Py:
                                                     16,
                                                 )
                                             )
-
                         else:  # otherwise, this is a immediate addressing
-                            input(keywordMetadata["bytes"])
                             bytesGiven.append(keywordMetadata["bytes"])
             byteLocation += 1
             # bytesGiven.append(self.optable["NOP impl"]["bytes"])#this is added so that when
             # it jumps to this memory location it's not empty and still exists on a 1:1 ratio
+        input(bytesGiven)
+        open(self.memoryFile, "wb").write(bytes(bytesGiven))
+        input("done")
 
-    def legacyConvert(self, fileIn, debug=False):
+    def convert(self, fileIn, debug=False):
         """Converts a given fileIn to the file set up when ApplePy1 was initialized."""
         print(
             "Welcome to LBAD (Lucas' Bad Assembler/Debugger)\nMIT License 2.0 - by Lucas Frias 2025"
@@ -468,6 +492,8 @@ class Apple1Py:
                     )
             elif trueKeyword == "NOP":
                 bytesGiven.append(self.optable["NOP impl"]["bytes"])
+            elif trueKeyword == "TXS":
+                bytesGiven.append(self.optable["TXS impl"]["bytes"])
             elif trueKeyword == "BCC":
                 bytesGiven.append(self.optable["BCC rel"]["bytes"])
             elif trueKeyword == "DEX":
@@ -535,6 +561,8 @@ class Apple1Py:
                 bytesGiven.append(self.optable["TXS impl"]["bytes"])
             elif trueKeyword == "TSX":
                 bytesGiven.append(self.optable["TSX impl"]["bytes"])
+            elif trueKeyword == "PHP":
+                bytesGiven.append(self.optable["PHP impl"]["bytes"])
             elif trueKeyword == "LDX":
                 if trueByteValue[0] == "#":  # immediate addressing
                     bytesGiven.append(self.optable["LDX imm"]["bytes"])
@@ -825,6 +853,15 @@ class Apple1Py:
         if opInt == 0xAA:  # TAX impl
             self.x = self.a
             self.pc += 1
+        if opInt == 0x08:  # PHP impl
+            registerStatus = self.makeStatusByte()
+            # write to the stack
+            input(registerStatus)
+            self.setB(self.sp, registerStatus)
+            print("i stored this data at", hex(self.sp))
+            input(self.getB(registerStatus))
+            self.sp -= 1
+            self.pc += 1
         if opInt == 164:  # LDA zpg
             self.pc += 2  # two offset for value
             self.a = self.getB(self.pc + 1)
@@ -905,7 +942,7 @@ class Apple1Py:
                 open("debug.log", "a").write("Neg Flag = 1\n")
                 self.negFlag = 1
             self.pc += 2
-        if opInt == 0x90:
+        if opInt == 0x90:  # CMP
             if self.carryFlag == 1:
                 # this is a relative address, jump up/down a relative ammount
                 self.setProgramCounterValueFromRelativeAddress(firstValueByte)

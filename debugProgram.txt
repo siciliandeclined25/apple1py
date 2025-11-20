@@ -1,7 +1,7 @@
-0000 Instruction: LDX imm (0xa2) -  | 0003 |  
-0002 Instruction: TXS impl (0x9a) - 
-0003 Instruction: LDX imm (0xa2) -  | 0000 |  
-0005 Instruction: TSX impl (0xba) - 
+0000 Instruction: CMP imm (0xc9) -  | 0000 |  
+0002 Instruction: PHP impl (0x8) - 
+0003 Instruction: BEQ rel (0xf0) -  | 0001 |  
+0005 Instruction: PHP impl (0x8) - 
 0006 Instruction: BRK impl (0x0) - 
 0007 Instruction: BRK impl (0x0) - 
 0008 Instruction: BRK impl (0x0) - 
