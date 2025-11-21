@@ -1,5 +1,6 @@
-import apple1
 import os
+
+import apple1
 
 debugme = (
     True if input("do you want to enable debug mode? (y/n): ").lower() == "y" else False
@@ -11,8 +12,6 @@ assemblenew = (
 )
 # print(debugme)
 # if debugme:
-if input("do you wanna access the memory debuuger rn>") == "y":
-    processor6502.memoryDisplayer()
 p = apple1.Apple1Py(file="mem.b")
 if assemblenew:
     os.system("ls")

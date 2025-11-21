@@ -15,7 +15,7 @@ class Apple1Py:
         # my own homemade 6502 optable!
         self.optable = {
             "BRK impl": {"ascii": "BRK", "bytes": 00, "space": 1},
-            "ORA ind x": {"ascii": "ORA", "bytes": 0x05, "space": 2},
+            "ORA ind x": {"ascii": "ORA", "bytes": 0x01, "space": 2},
             "NOP impl": {"ascii": "NOP", "bytes": 0xEA, "space": 1},
             "LDA zpg": {"ascii": "LDA", "bytes": 0xA5, "space": 2},  # zeropage (0-256)
             "LDA imm": {
@@ -524,6 +524,9 @@ class Apple1Py:
                 bytesGiven.append(self.optable["CLC impl"]["bytes"])
             elif trueKeyword == "TAX":
                 bytesGiven.append(self.optable["TAX impl"]["bytes"])
+            elif trueKeyword == "ORA":
+                if trueByteValue[-1] == "X":
+                    bytesGiven.append(self.optable["ORA ind x"]["bytes"])
             elif trueKeyword == "BEQ":
                 bytesGiven.append(self.optable["BEQ rel"]["bytes"])
                 try:
@@ -974,7 +977,41 @@ class Apple1Py:
             open("debug.log", "a").write(
                 "Program Counter: Jumped to $" + str(finalByte) + " \n"
             )
-
+        if opInt == 0x01:  # ORA ind x
+            # i hate this and this will be so hard to explain
+            # okay so first we need to get
+            # the sum of x and the ora operator
+            zeroPageORA = firstValueByte + self.x
+            if zeroPageORA > 255:
+                zeroPageORA -= 256  # wrap bac around to correct zeropage
+            # okay now that we have the ORA sum we need to access the zpg addr
+            lowZeroPageORA = self.getB(zeroPageORA)
+            highZeroPageORA = self.getB(zeroPageORA + 1)
+            absoluteAddressORA = (lowZeroPageORA) | (highZeroPageORA << 8)
+            # okay so we've now assembled the correct address to go to
+            # let's get that value
+            absValueORA = self.getB(absoluteAddressORA)
+            # now i will set a to the correct value in the accumulator
+            self.a = (a | val) & 0xFF
+            # what are we even doing 6502 why does this exist
+        if opInt == 0x11:  # ORA ind y
+            # same code as ORA zpg x - self.x + self.y
+            # i hate this and this will be so hard to explain
+            # okay so first we need to get
+            # the sum of x and the ora operator
+            zeroPageORA = firstValueByte + self.y
+            if zeroPageORA > 255:
+                zeroPageORA -= 256  # wrap bac around to correct zeropage
+            # okay now that we have the ORA sum we need to access the zpg addr
+            lowZeroPageORA = self.getB(zeroPageORA)
+            highZeroPageORA = self.getB(zeroPageORA + 1)
+            absoluteAddressORA = (lowZeroPageORA) | (highZeroPageORA << 8)
+            # okay so we've now assembled the correct address to go to
+            # let's get that value
+            absValueORA = self.getB(absoluteAddressORA)
+            # now i will set a to the correct value in the accumulator
+            self.a = (a | val) & 0xFF
+            # what are we even doing
         if opInt == 101:  # STA zpg
             # loads into value the zeropage
             self.pc += 2
